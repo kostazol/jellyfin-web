@@ -1,0 +1,69 @@
+name: Apply localized alphabet v2 web changes
+
+on:
+  push:
+    branches:
+      - build/localized-alphabet-v2
+    paths:
+      - scripts/apply-localized-alphabet-v2-web.py
+      - .github/workflows/apply-localized-alphabet-v2-web.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: build/localized-alphabet-v2
+          fetch-depth: 0
+
+      - name: Apply v2 web patch
+        run: python3 scripts/apply-localized-alphabet-v2-web.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run build:check
+
+      - name: Lint changed TypeScript
+        run: >-
+          npx eslint
+          src/apps/modern/features/libraries/utils/alphabet.ts
+          src/apps/modern/features/libraries/utils/alphabet.test.ts
+          src/apps/modern/features/libraries/components/AlphabetPicker.tsx
+          src/apps/modern/features/libraries/components/ItemsView.tsx
+          src/hooks/useFetchItems.ts
+          src/apps/dashboard/routes/settings/index.tsx
+
+      - name: Test alphabet utilities
+        run: npm test -- src/apps/modern/features/libraries/utils/alphabet.test.ts
+
+      - name: Create clean feature commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/apps/modern/features/libraries/utils/alphabet.ts \
+            src/apps/modern/features/libraries/utils/alphabet.test.ts \
+            src/apps/modern/features/libraries/components/AlphabetPicker.tsx \
+            src/apps/modern/features/libraries/components/ItemsView.tsx \
+            src/hooks/useFetchItems.ts \
+            src/apps/dashboard/routes/settings/index.tsx \
+            src/strings/en-us.json \
+            src/strings/ru.json
+          git commit -m "feat: add global localized alphabet navigation"
+          FEATURE_COMMIT=$(git rev-parse HEAD)
+          git checkout -B localized-alphabet-clean 28a006147dab49843024c62714008ca343169f7c
+          git cherry-pick "$FEATURE_COMMIT"
+          git push --force origin HEAD:feature/localized-alphabet-navigation
