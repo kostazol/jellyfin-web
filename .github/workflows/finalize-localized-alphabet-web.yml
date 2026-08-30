@@ -6,6 +6,7 @@ on:
       - build/localized-alphabet-v2
     paths:
       - scripts/finalize-localized-alphabet-web.py
+      - scripts/finalize-localized-alphabet-web-followup.py
       - .github/workflows/finalize-localized-alphabet-web.yml
   workflow_dispatch:
 
@@ -43,6 +44,7 @@ jobs:
         run: |
           git -C source restore --source=upstream/master -- src/strings/ru.json
           python3 tooling/scripts/finalize-localized-alphabet-web.py source
+          python3 tooling/scripts/finalize-localized-alphabet-web-followup.py source
           git -C source diff --check
 
       - name: Verify translation scope
