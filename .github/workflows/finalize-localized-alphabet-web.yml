@@ -1,0 +1,97 @@
+name: Finalize localized alphabet web branch
+
+on:
+  push:
+    branches:
+      - build/localized-alphabet-v2
+    paths:
+      - scripts/finalize-localized-alphabet-web.py
+      - .github/workflows/finalize-localized-alphabet-web.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout tooling branch
+        uses: actions/checkout@v4
+        with:
+          ref: build/localized-alphabet-v2
+          path: tooling
+
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/localized-alphabet-navigation
+          fetch-depth: 0
+          path: source
+
+      - name: Rebase on current upstream master
+        working-directory: source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/jellyfin/jellyfin-web.git
+          git fetch upstream master
+          git rebase upstream/master
+
+      - name: Apply upstream-ready changes
+        run: |
+          git -C source restore --source=upstream/master -- src/strings/ru.json
+          python3 tooling/scripts/finalize-localized-alphabet-web.py source
+          git -C source diff --check
+
+      - name: Verify translation scope
+        working-directory: source
+        run: |
+          CHANGED_TRANSLATIONS=$(git diff --name-only upstream/master -- src/strings | grep -v '^src/strings/en-us.json$' || true)
+          if [ -n "$CHANGED_TRANSLATIONS" ]; then
+            echo "Unexpected non-source translation changes:"
+            echo "$CHANGED_TRANSLATIONS"
+            exit 1
+          fi
+
+      - name: Setup node environment
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: source/.nvmrc
+          cache: npm
+          cache-dependency-path: source/package-lock.json
+
+      - name: Install dependencies
+        working-directory: source
+        run: npm ci --no-audit
+
+      - name: Lint
+        working-directory: source
+        run: npm run lint
+
+      - name: Stylelint
+        working-directory: source
+        run: npm run stylelint
+
+      - name: Type check
+        working-directory: source
+        run: npm run build:check
+
+      - name: Unit tests
+        working-directory: source
+        run: npm run test
+
+      - name: Production build and browser syntax check
+        working-directory: source
+        run: npm run build:es-check
+
+      - name: Squash and publish feature branch
+        working-directory: source
+        run: |
+          git add -A
+          git commit -m "Polish localized alphabet navigation"
+          git reset --soft upstream/master
+          git commit -m "Add global localized alphabet navigation"
+          git diff --check upstream/master..HEAD
+          git push --force-with-lease origin HEAD:feature/localized-alphabet-navigation
