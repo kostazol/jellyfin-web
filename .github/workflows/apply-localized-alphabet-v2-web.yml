@@ -6,6 +6,7 @@ on:
       - build/localized-alphabet-v2
     paths:
       - scripts/apply-localized-alphabet-v2-web.py
+      - scripts/fix-localized-alphabet-v2-web.py
       - .github/workflows/apply-localized-alphabet-v2-web.yml
   workflow_dispatch:
 
@@ -23,7 +24,9 @@ jobs:
           fetch-depth: 0
 
       - name: Apply v2 web patch
-        run: python3 scripts/apply-localized-alphabet-v2-web.py
+        run: |
+          python3 scripts/apply-localized-alphabet-v2-web.py
+          python3 scripts/fix-localized-alphabet-v2-web.py
 
       - uses: actions/setup-node@v4
         with:
