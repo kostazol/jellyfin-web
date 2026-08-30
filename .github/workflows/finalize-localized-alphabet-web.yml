@@ -5,7 +5,6 @@ on:
     branches:
       - build/localized-alphabet-v2
     paths:
-      - scripts/finalize-localized-alphabet-web.py
       - scripts/finalize-localized-alphabet-web-followup.py
       - .github/workflows/finalize-localized-alphabet-web.yml
   workflow_dispatch:
@@ -40,10 +39,9 @@ jobs:
           git fetch upstream master
           git rebase upstream/master
 
-      - name: Apply upstream-ready changes
+      - name: Apply final upstream-ready changes
         run: |
           git -C source restore --source=upstream/master -- src/strings/ru.json
-          python3 tooling/scripts/finalize-localized-alphabet-web.py source
           python3 tooling/scripts/finalize-localized-alphabet-web-followup.py source
           git -C source diff --check
 
