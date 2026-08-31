@@ -18,6 +18,7 @@ latin_block = '''\n// Only locales whose alphabet can be represented safely by A
 if latin_block not in text:
     raise SystemExit('Expected implicit Latin locale block not found')
 text = text.replace(latin_block, '\n')
+text = text.replace('\n\n\n// Additional scripts', '\n\n// Additional scripts')
 
 text = text.replace(
 '''    const localeParts = normalizedLocale.split('-');\n    if (localeParts.includes('latn') || LATIN_LOCALE_PREFIXES.has(localeParts[0])) {\n        return LATIN;\n    }\n''',
