@@ -6,6 +6,7 @@ on:
       - build/localized-alphabet-v2
     paths:
       - scripts/audit-localized-alphabet-web.py
+      - scripts/audit-localized-alphabet-web-final.py
       - .github/workflows/audit-localized-alphabet-web.yml
   workflow_dispatch:
 
@@ -13,7 +14,7 @@ permissions:
   contents: write
 
 env:
-  EXPECTED_FEATURE_HEAD: a201f91a3c1b7863a9e477d73e3f004d8a034ddb
+  EXPECTED_FEATURE_HEAD: dcef9100affbba6d2fe25983271ef7ff3e8ed3c9
 
 jobs:
   audit:
@@ -55,6 +56,7 @@ jobs:
         working-directory: source
         run: |
           python3 ../tooling/scripts/audit-localized-alphabet-web.py .
+          python3 ../tooling/scripts/audit-localized-alphabet-web-final.py .
           git diff --check
 
       - name: Verify localization scope
@@ -129,6 +131,10 @@ jobs:
       - name: Type check
         working-directory: source
         run: npm run build:check
+
+      - name: Localized alphabet unit tests
+        working-directory: source
+        run: npx vitest run src/apps/modern/features/libraries/utils/alphabet.test.ts
 
       - name: Unit tests
         working-directory: source
