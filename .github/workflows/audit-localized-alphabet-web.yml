@@ -5,7 +5,6 @@ on:
     branches:
       - build/localized-alphabet-v2
     paths:
-      - scripts/audit-localized-alphabet-web.py
       - scripts/audit-localized-alphabet-web-final.py
       - .github/workflows/audit-localized-alphabet-web.yml
   workflow_dispatch:
@@ -52,10 +51,9 @@ jobs:
           git fetch upstream master
           git rebase upstream/master
 
-      - name: Apply audit fixes
+      - name: Apply final audit fixes
         working-directory: source
         run: |
-          python3 ../tooling/scripts/audit-localized-alphabet-web.py .
           python3 ../tooling/scripts/audit-localized-alphabet-web-final.py .
           git diff --check
 
