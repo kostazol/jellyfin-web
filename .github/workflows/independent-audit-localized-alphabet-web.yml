@@ -1,0 +1,97 @@
+name: Independent localized alphabet web audit
+
+on:
+  push:
+    branches:
+      - build/localized-alphabet-v2
+    paths:
+      - .github/workflows/independent-audit-localized-alphabet-web.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FEATURE_SHA: 459fd45b6cb75bb0233b4c8be0f6f6548d5e6f69
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout exact feature revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.FEATURE_SHA }}
+          fetch-depth: 0
+
+      - name: Fetch current upstream master
+        run: |
+          git remote add upstream https://github.com/jellyfin/jellyfin-web.git
+          git fetch upstream master
+          test "$(git rev-parse HEAD)" = "$FEATURE_SHA"
+
+      - name: Audit history and diff scope
+        run: |
+          test "$(git rev-list --count upstream/master..HEAD)" -eq 3
+          test "$(git rev-list --count HEAD..upstream/master)" -eq 0
+          test -z "$(git log --format='%an <%ae>%n%cn <%ce>' upstream/master..HEAD | grep -v '^kostazol <kottik06@gmail.com>$' || true)"
+          test -z "$(git log --format='%s' upstream/master..HEAD | grep -E '^(feat|fix|chore|refactor|test|style|ci)(\(.+\))?:' || true)"
+          test -z "$(git diff --name-only upstream/master..HEAD | grep -E '^(\.github/|scripts/|Dockerfile|docker/)' || true)"
+          git diff --check upstream/master..HEAD
+          echo 'Changed files:'
+          git diff --name-only upstream/master..HEAD
+
+      - name: Audit localization scope
+        run: |
+          CHANGED_TRANSLATIONS=$(git diff --name-only upstream/master..HEAD -- src/strings | grep -v '^src/strings/en-us.json$' || true)
+          test -z "$CHANGED_TRANSLATIONS" || {
+            echo "Unexpected manually changed translations:"
+            echo "$CHANGED_TRANSLATIONS"
+            exit 1
+          }
+
+      - name: Audit grouped alias semantics statically
+        run: |
+          grep -F "groups.push(group.join('|'))" src/apps/modern/features/libraries/utils/alphabet.ts
+          grep -F "expect(order[0]).toBe('Α|Ά')" src/apps/modern/features/libraries/utils/alphabet.test.ts
+          grep -F "expect(order.at(-1)).toBe('Ω|Ώ')" src/apps/modern/features/libraries/utils/alphabet.test.ts
+          grep -F "expect(filter.params?.nameInitialSortOrder).toBeUndefined()" src/apps/modern/features/libraries/utils/alphabet.test.ts
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit
+
+      - name: Verify every feature commit type-checks
+        run: |
+          FEATURE=$(git rev-parse HEAD)
+          for COMMIT in $(git rev-list --reverse upstream/master..HEAD); do
+            echo "Type-checking $COMMIT $(git show -s --format=%s $COMMIT)"
+            git checkout --detach "$COMMIT"
+            npm run build:check
+          done
+          git checkout --detach "$FEATURE"
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Stylelint
+        run: npm run stylelint
+
+      - name: Type check
+        run: npm run build:check
+
+      - name: Focused localized alphabet tests
+        run: npx vitest run src/apps/modern/features/libraries/utils/alphabet.test.ts
+
+      - name: Full unit tests
+        run: npm run test
+
+      - name: Production build and browser syntax check
+        run: npm run build:es-check
