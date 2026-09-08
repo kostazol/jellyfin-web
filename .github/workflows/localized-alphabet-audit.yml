@@ -1,0 +1,57 @@
+name: Localized alphabet audit
+on:
+  push:
+    branches: [audit/localized-alphabet-20260908]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: audit
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 459fd45b6cb75bb0233b4c8be0f6f6548d5e6f69
+          path: code
+      - id: commit
+        working-directory: code
+        run: |
+          git apply --check ../audit/web.patch
+          git apply ../audit/web.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/hooks/useFetchItems.ts src/apps/modern/features/libraries/components/GenresItemsContainer.tsx src/apps/modern/features/libraries/components/GenresItemsContainer.test.tsx
+          git commit -m 'Keep library browsing available when system information fails'
+          git add src/apps/modern/features/libraries/utils/alphabet.ts src/apps/modern/features/libraries/utils/alphabet.test.ts
+          git commit -m 'Ignore unknown alphabet scripts and simplify filters'
+          git add src/apps/modern/features/libraries/components/AlphabetPicker.tsx src/apps/modern/features/libraries/components/AlphabetPicker.test.tsx
+          git commit -m 'Share alphabet picker group rendering'
+          git push origin HEAD:refs/heads/audit/localized-alphabet-candidate-20260908
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  checks:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        command: [lint, stylelint, build:check, test, build:es-check]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit
+      - run: npm run ${{ matrix.command }}

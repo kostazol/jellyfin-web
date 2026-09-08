@@ -1,0 +1,279 @@
+diff --git a/src/apps/modern/features/libraries/components/AlphabetPicker.test.tsx b/src/apps/modern/features/libraries/components/AlphabetPicker.test.tsx
+new file mode 100644
+index 0000000..42db08b
+--- /dev/null
++++ b/src/apps/modern/features/libraries/components/AlphabetPicker.test.tsx
+@@ -0,0 +1,32 @@
++import React from 'react';
++import { renderToStaticMarkup } from 'react-dom/server';
++import { describe, expect, it, vi } from 'vitest';
++
++import AlphabetPicker from './AlphabetPicker';
++
++const renderPicker = (groups?: { id: string; values: string[] }[]) => {
++    const container = document.createElement('div');
++    container.innerHTML = renderToStaticMarkup(<AlphabetPicker groups={groups} onChange={vi.fn()} />);
++    return container;
++};
++
++describe('AlphabetPicker', () => {
++    it.each([undefined, []])('keeps the legacy picker when groups are %s', groups => {
++        const container = renderPicker(groups);
++        const buttons = Array.from(container.querySelectorAll('button'), button => button.textContent);
++
++        expect(buttons).toEqual(['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ']);
++        expect(container.querySelectorAll('[role="group"]')).toHaveLength(1);
++    });
++
++    it('shows Other only once before the localized alphabets', () => {
++        const container = renderPicker([
++            { id: 'greek', values: ['Α', 'Β'] },
++            { id: 'latin', values: ['A', 'B'] }
++        ]);
++        const buttons = Array.from(container.querySelectorAll('button'), button => button.textContent);
++
++        expect(buttons).toEqual(['#', 'Α', 'Β', 'A', 'B']);
++        expect(container.querySelectorAll('[role="group"]')).toHaveLength(2);
++    });
++});
+diff --git a/src/apps/modern/features/libraries/components/AlphabetPicker.tsx b/src/apps/modern/features/libraries/components/AlphabetPicker.tsx
+index f993210..d01db83 100644
+--- a/src/apps/modern/features/libraries/components/AlphabetPicker.tsx
++++ b/src/apps/modern/features/libraries/components/AlphabetPicker.tsx
+@@ -74,6 +74,7 @@ const AlphabetPicker: React.FC<AlphabetPickerProps> = ({
+     );
+ 
+     const localizedGroups = groups?.length ? groups : undefined;
++    const pickerGroups = localizedGroups ?? [{ id: 'legacy', values: LETTER_VALUES }];
+ 
+     return (
+         <Box
+@@ -97,17 +98,7 @@ const AlphabetPicker: React.FC<AlphabetPickerProps> = ({
+                 zIndex: theme.zIndex.appBar - 1
+             })}
+         >
+-            {!localizedGroups ? (
+-                <Paper
+-                    elevation={0}
+-                    sx={{
+-                        borderRadius: 1,
+-                        overflow: 'hidden'
+-                    }}
+-                >
+-                    <AlphabetButtons values={LETTER_VALUES} value={value} onChange={handleValue} />
+-                </Paper>
+-            ) : localizedGroups.map((group, groupIndex) => (
++            {pickerGroups.map((group, groupIndex) => (
+                 <Paper
+                     key={group.id}
+                     elevation={0}
+@@ -117,7 +108,7 @@ const AlphabetPicker: React.FC<AlphabetPickerProps> = ({
+                     }}
+                 >
+                     <AlphabetButtons
+-                        values={groupIndex === 0 ? ['#', ...group.values] : group.values}
++                        values={localizedGroups && groupIndex === 0 ? ['#', ...group.values] : group.values}
+                         value={value}
+                         onChange={handleValue}
+                     />
+diff --git a/src/apps/modern/features/libraries/components/GenresItemsContainer.test.tsx b/src/apps/modern/features/libraries/components/GenresItemsContainer.test.tsx
+new file mode 100644
+index 0000000..bfbefd2
+--- /dev/null
++++ b/src/apps/modern/features/libraries/components/GenresItemsContainer.test.tsx
+@@ -0,0 +1,50 @@
++import React from 'react';
++import { renderToStaticMarkup } from 'react-dom/server';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++import { useSystemInfo } from 'hooks/useSystemInfo';
++
++import { useGenres } from '../hooks/api/useGenres';
++import GenresItemsContainer from './GenresItemsContainer';
++
++vi.mock('hooks/useSystemInfo', () => ({ useSystemInfo: vi.fn() }));
++vi.mock('../hooks/api/useGenres', () => ({ useGenres: vi.fn() }));
++vi.mock('usehooks-ts', () => ({
++    useIntersectionObserver: () => ({ ref: vi.fn(), isIntersecting: false })
++}));
++vi.mock('components/common/NoItemsMessage', () => ({ default: () => 'No genres' }));
++vi.mock('components/loading/LoadingComponent', () => ({ default: () => 'Loading' }));
++vi.mock('./AlphabetPicker', () => ({ default: () => null }));
++vi.mock('./GenresSectionContainer', () => ({ default: () => null }));
++
++describe('GenresItemsContainer', () => {
++    beforeEach(() => {
++        vi.mocked(useGenres).mockReturnValue({
++            data: { pages: [] },
++            isLoading: false,
++            hasNextPage: false,
++            isFetchingNextPage: false,
++            fetchNextPage: vi.fn()
++        } as unknown as ReturnType<typeof useGenres>);
++    });
++
++    it.each([
++        [true, false, 'Loading'],
++        [false, true, 'No genres']
++    ])('handles pending SystemInfo: %s', (isPending, enabled, expected) => {
++        vi.mocked(useSystemInfo).mockReturnValue({
++            data: undefined,
++            isPending
++        } as ReturnType<typeof useSystemInfo>);
++
++        const markup = renderToStaticMarkup(
++            <GenresItemsContainer parentId='library' collectionType={undefined} itemType={[]} />
++        );
++
++        expect(markup).toBe(expected);
++        expect(useGenres).toHaveBeenLastCalledWith(expect.objectContaining({
++            enabled,
++            alphabetNavigationSettings: { enabled: false, locale: '', additionalScripts: [] }
++        }));
++    });
++});
+diff --git a/src/apps/modern/features/libraries/components/GenresItemsContainer.tsx b/src/apps/modern/features/libraries/components/GenresItemsContainer.tsx
+index 0f44416..e1577c0 100644
+--- a/src/apps/modern/features/libraries/components/GenresItemsContainer.tsx
++++ b/src/apps/modern/features/libraries/components/GenresItemsContainer.tsx
+@@ -27,7 +27,7 @@ const GenresItemsContainer: FC<GenresItemsContainerProps> = ({
+     itemType
+ }) => {
+     const [alphabet, setAlphabet] = useState<string | null>();
+-    const { data: systemInfo } = useSystemInfo();
++    const { data: systemInfo, isPending: isSystemInfoPending } = useSystemInfo();
+     const alphabetNavigationSettings = useMemo(
+         () => getAlphabetNavigationSettings(systemInfo),
+         [systemInfo]
+@@ -47,7 +47,7 @@ const GenresItemsContainer: FC<GenresItemsContainerProps> = ({
+         includeItemTypes: itemType,
+         alphabet,
+         alphabetNavigationSettings,
+-        enabled: Boolean(systemInfo)
++        enabled: !isSystemInfoPending
+     });
+ 
+     const genres = useMemo(
+@@ -65,7 +65,7 @@ const GenresItemsContainer: FC<GenresItemsContainerProps> = ({
+         }
+     }, [isIntersecting, hasNextPage, isFetchingNextPage, fetchNextPage]);
+ 
+-    if (!systemInfo) {
++    if (isSystemInfoPending) {
+         return <Loading />;
+     }
+ 
+diff --git a/src/apps/modern/features/libraries/utils/alphabet.test.ts b/src/apps/modern/features/libraries/utils/alphabet.test.ts
+index 233f0e1..c81d949 100644
+--- a/src/apps/modern/features/libraries/utils/alphabet.test.ts
++++ b/src/apps/modern/features/libraries/utils/alphabet.test.ts
+@@ -139,6 +139,26 @@ describe('localized alphabet navigation', () => {
+         expect(groups).toHaveLength(1);
+     });
+ 
++    it.each(['Unknown', '__proto__', 'constructor', 'toString'])(
++        'ignores an unknown additional script: %s',
++        script => {
++            const settings = { ...greek, additionalScripts: [script] };
++            expect(getLocalizedAlphabetGroups(settings, LibraryTab.Movies)).toHaveLength(1);
++            expect(getAlphabetFilter(null, settings, LibraryTab.Movies))
++                .toEqual(getAlphabetFilter(null, greek, LibraryTab.Movies));
++        }
++    );
++
++    it('ignores duplicate additional scripts', () => {
++        const settings = { ...greek, additionalScripts: ['Latn', 'Latn'] };
++        expect(getLocalizedAlphabetGroups(settings, LibraryTab.Movies)).toHaveLength(2);
++    });
++
++    it('clears a stale letter selection after the alphabet changes', () => {
++        expect(getAlphabetFilter('Я', greek, LibraryTab.Movies))
++            .toEqual(getAlphabetFilter(null, greek, LibraryTab.Movies));
++    });
++
+     it('keeps ordinary Latin locales on the legacy picker', () => {
+         expect(getPrimaryAlphabetDefinition('en-US')).toBeUndefined();
+         expect(getPrimaryAlphabetDefinition('fr-FR')).toBeUndefined();
+diff --git a/src/apps/modern/features/libraries/utils/alphabet.ts b/src/apps/modern/features/libraries/utils/alphabet.ts
+index b615092..1cfe65d 100644
+--- a/src/apps/modern/features/libraries/utils/alphabet.ts
++++ b/src/apps/modern/features/libraries/utils/alphabet.ts
+@@ -93,9 +93,9 @@ const DEFINITIONS = [GREEK, CYRILLIC_RU, CYRILLIC_UK, CYRILLIC_BE, CYRILLIC_BG,
+ // Additional scripts need a single unambiguous alphabet definition. Some
+ // scripts (for example Cyrillic) differ by locale, so they should not be
+ // guessed here until the UI can select a concrete alphabet definition.
+-const ADDITIONAL_DEFINITIONS: Record<string, AlphabetDefinition> = {
+-    Latn: LATIN
+-};
++const ADDITIONAL_DEFINITIONS = new Map<string, AlphabetDefinition>([
++    ['Latn', LATIN]
++]);
+ 
+ const LOCALIZED_ALPHABET_VIEW_TYPES = new Set<LibraryTab>([
+     LibraryTab.Albums,
+@@ -183,7 +183,7 @@ const getEnabledAlphabets = (
+ 
+     const definitions = [primaryDefinition];
+     for (const script of settings.additionalScripts) {
+-        const definition = ADDITIONAL_DEFINITIONS[script];
++        const definition = ADDITIONAL_DEFINITIONS.get(script);
+         if (definition && !definitions.some(candidate => candidate.id === definition.id)) {
+             definitions.push(definition);
+         }
+@@ -263,24 +263,14 @@ export const getAlphabetFilter = (
+         return { query: getLegacyAlphabetQuery(selectedAlphabet) };
+     }
+ 
+-    const orderedInitials = getOrderedInitials(enabled);
+-    const orderedInitialGroups = getOrderedInitialGroups(enabled);
+-
+-    if (!selectedAlphabet) {
+-        return {
+-            query: {},
+-            params: { nameInitialSortOrder: orderedInitialGroups.join(',') }
+-        };
+-    }
+-
+     if (selectedAlphabet === '#') {
+         return {
+             query: {},
+-            params: { excludeNameInitials: orderedInitials.join(',') }
++            params: { excludeNameInitials: getOrderedInitials(enabled).join(',') }
+         };
+     }
+ 
+-    const selectedInitials = getSelectedInitials(enabled, selectedAlphabet);
++    const selectedInitials = selectedAlphabet ? getSelectedInitials(enabled, selectedAlphabet) : [];
+     if (selectedInitials.length > 0) {
+         return {
+             query: {},
+@@ -290,6 +280,6 @@ export const getAlphabetFilter = (
+ 
+     return {
+         query: {},
+-        params: { nameInitialSortOrder: orderedInitialGroups.join(',') }
++        params: { nameInitialSortOrder: getOrderedInitialGroups(enabled).join(',') }
+     };
+ };
+diff --git a/src/hooks/useFetchItems.ts b/src/hooks/useFetchItems.ts
+index de940d7..043d6ef 100644
+--- a/src/hooks/useFetchItems.ts
++++ b/src/hooks/useFetchItems.ts
+@@ -361,7 +361,7 @@ export const useGetItemsViewByType = (
+     libraryViewSettings: LibraryViewSettings
+ ) => {
+     const currentApi = useApi();
+-    const { data: systemInfo } = useSystemInfo();
++    const { data: systemInfo, isPending: isSystemInfoPending } = useSystemInfo();
+     const alphabetNavigationSettings = getAlphabetNavigationSettings(systemInfo);
+     return useQuery({
+         queryKey: [
+@@ -388,7 +388,7 @@ export const useGetItemsViewByType = (
+                 { signal }
+             ),
+         refetchOnWindowFocus: false,
+-        enabled: !!currentApi.api && !!currentApi.user?.Id && !!systemInfo
++        enabled: !!currentApi.api && !!currentApi.user?.Id && !isSystemInfoPending
+             && viewType
+             && [
+                 LibraryTab.Movies,
