@@ -27,7 +27,7 @@ const GenresItemsContainer: FC<GenresItemsContainerProps> = ({
     itemType
 }) => {
     const [alphabet, setAlphabet] = useState<string | null>();
-    const { data: systemInfo } = useSystemInfo();
+    const { data: systemInfo, isPending: isSystemInfoPending } = useSystemInfo();
     const alphabetNavigationSettings = useMemo(
         () => getAlphabetNavigationSettings(systemInfo),
         [systemInfo]
@@ -47,7 +47,7 @@ const GenresItemsContainer: FC<GenresItemsContainerProps> = ({
         includeItemTypes: itemType,
         alphabet,
         alphabetNavigationSettings,
-        enabled: Boolean(systemInfo)
+        enabled: !isSystemInfoPending
     });
 
     const genres = useMemo(
@@ -65,7 +65,7 @@ const GenresItemsContainer: FC<GenresItemsContainerProps> = ({
         }
     }, [isIntersecting, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-    if (!systemInfo) {
+    if (isSystemInfoPending) {
         return <Loading />;
     }
 

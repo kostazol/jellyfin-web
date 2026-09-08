@@ -361,7 +361,7 @@ export const useGetItemsViewByType = (
     libraryViewSettings: LibraryViewSettings
 ) => {
     const currentApi = useApi();
-    const { data: systemInfo } = useSystemInfo();
+    const { data: systemInfo, isPending: isSystemInfoPending } = useSystemInfo();
     const alphabetNavigationSettings = getAlphabetNavigationSettings(systemInfo);
     return useQuery({
         queryKey: [
@@ -388,7 +388,7 @@ export const useGetItemsViewByType = (
                 { signal }
             ),
         refetchOnWindowFocus: false,
-        enabled: !!currentApi.api && !!currentApi.user?.Id && !!systemInfo
+        enabled: !!currentApi.api && !!currentApi.user?.Id && !isSystemInfoPending
             && viewType
             && [
                 LibraryTab.Movies,
