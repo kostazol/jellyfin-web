@@ -73,6 +73,15 @@ describe('localized alphabet navigation', () => {
         expect(filter.query).toEqual({ nameLessThan: 'A', nameStartsWith: undefined });
     });
 
+    it.each([
+        { enabled: false, locale: 'ru-RU', additionalScripts: [] },
+        { enabled: true, locale: 'en-US', additionalScripts: [] },
+        getAlphabetNavigationSettings()
+    ])('drops stale native selections when falling back to the legacy picker: %j', settings => {
+        expect(getAlphabetFilter('Я', settings, LibraryTab.Movies)).toEqual(getAlphabetFilter(null, settings, LibraryTab.Movies));
+        expect(getAlphabetFilter('A', settings, LibraryTab.Movies).query.nameStartsWith).toBe('A');
+    });
+
     it('sends native initial ordering only when no bucket is selected', () => {
         const filter = getAlphabetFilter(null, russian, LibraryTab.Movies);
         const order = filter.params?.nameInitialSortOrder?.split(',') ?? [];

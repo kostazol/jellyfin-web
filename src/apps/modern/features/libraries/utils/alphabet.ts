@@ -123,7 +123,7 @@ const normalizeLocale = (locale: string) => locale.replace(/_/g, '-').toLowerCas
 
 const getLegacyAlphabetQuery = (alphabet?: string | null): LegacyAlphabetQuery => ({
     nameLessThan: alphabet === '#' ? 'A' : undefined,
-    nameStartsWith: alphabet === '#' ? undefined : (alphabet ?? undefined)
+    nameStartsWith: alphabet && LATIN.values.includes(alphabet) ? alphabet : undefined
 });
 
 export const getAlphabetNavigationSettings = (
