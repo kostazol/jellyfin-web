@@ -139,6 +139,26 @@ describe('localized alphabet navigation', () => {
         expect(groups).toHaveLength(1);
     });
 
+    it.each(['Unknown', '__proto__', 'constructor', 'toString'])(
+        'ignores an unknown additional script: %s',
+        script => {
+            const settings = { ...greek, additionalScripts: [script] };
+            expect(getLocalizedAlphabetGroups(settings, LibraryTab.Movies)).toHaveLength(1);
+            expect(getAlphabetFilter(null, settings, LibraryTab.Movies))
+                .toEqual(getAlphabetFilter(null, greek, LibraryTab.Movies));
+        }
+    );
+
+    it('ignores duplicate additional scripts', () => {
+        const settings = { ...greek, additionalScripts: ['Latn', 'Latn'] };
+        expect(getLocalizedAlphabetGroups(settings, LibraryTab.Movies)).toHaveLength(2);
+    });
+
+    it('clears a stale letter selection after the alphabet changes', () => {
+        expect(getAlphabetFilter('Я', greek, LibraryTab.Movies))
+            .toEqual(getAlphabetFilter(null, greek, LibraryTab.Movies));
+    });
+
     it('keeps ordinary Latin locales on the legacy picker', () => {
         expect(getPrimaryAlphabetDefinition('en-US')).toBeUndefined();
         expect(getPrimaryAlphabetDefinition('fr-FR')).toBeUndefined();

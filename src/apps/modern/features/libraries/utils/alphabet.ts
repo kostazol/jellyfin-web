@@ -93,9 +93,9 @@ const DEFINITIONS = [GREEK, CYRILLIC_RU, CYRILLIC_UK, CYRILLIC_BE, CYRILLIC_BG, 
 // Additional scripts need a single unambiguous alphabet definition. Some
 // scripts (for example Cyrillic) differ by locale, so they should not be
 // guessed here until the UI can select a concrete alphabet definition.
-const ADDITIONAL_DEFINITIONS: Record<string, AlphabetDefinition> = {
-    Latn: LATIN
-};
+const ADDITIONAL_DEFINITIONS = new Map<string, AlphabetDefinition>([
+    ['Latn', LATIN]
+]);
 
 const LOCALIZED_ALPHABET_VIEW_TYPES = new Set<LibraryTab>([
     LibraryTab.Albums,
@@ -183,7 +183,7 @@ const getEnabledAlphabets = (
 
     const definitions = [primaryDefinition];
     for (const script of settings.additionalScripts) {
-        const definition = ADDITIONAL_DEFINITIONS[script];
+        const definition = ADDITIONAL_DEFINITIONS.get(script);
         if (definition && !definitions.some(candidate => candidate.id === definition.id)) {
             definitions.push(definition);
         }
@@ -263,24 +263,14 @@ export const getAlphabetFilter = (
         return { query: getLegacyAlphabetQuery(selectedAlphabet) };
     }
 
-    const orderedInitials = getOrderedInitials(enabled);
-    const orderedInitialGroups = getOrderedInitialGroups(enabled);
-
-    if (!selectedAlphabet) {
-        return {
-            query: {},
-            params: { nameInitialSortOrder: orderedInitialGroups.join(',') }
-        };
-    }
-
     if (selectedAlphabet === '#') {
         return {
             query: {},
-            params: { excludeNameInitials: orderedInitials.join(',') }
+            params: { excludeNameInitials: getOrderedInitials(enabled).join(',') }
         };
     }
 
-    const selectedInitials = getSelectedInitials(enabled, selectedAlphabet);
+    const selectedInitials = selectedAlphabet ? getSelectedInitials(enabled, selectedAlphabet) : [];
     if (selectedInitials.length > 0) {
         return {
             query: {},
@@ -290,6 +280,6 @@ export const getAlphabetFilter = (
 
     return {
         query: {},
-        params: { nameInitialSortOrder: orderedInitialGroups.join(',') }
+        params: { nameInitialSortOrder: getOrderedInitialGroups(enabled).join(',') }
     };
 };
