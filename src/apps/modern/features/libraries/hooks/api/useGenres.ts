@@ -55,6 +55,7 @@ export const getGenresQuery = (
     return infiniteQueryOptions({
         queryKey: [
             'Genres',
+            params.userId,
             params.parentId,
             params.includeItemTypes,
             params.alphabet,
