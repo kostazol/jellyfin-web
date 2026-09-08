@@ -74,6 +74,7 @@ const AlphabetPicker: React.FC<AlphabetPickerProps> = ({
     );
 
     const localizedGroups = groups?.length ? groups : undefined;
+    const pickerGroups = localizedGroups ?? [{ id: 'legacy', values: LETTER_VALUES }];
 
     return (
         <Box
@@ -97,17 +98,7 @@ const AlphabetPicker: React.FC<AlphabetPickerProps> = ({
                 zIndex: theme.zIndex.appBar - 1
             })}
         >
-            {!localizedGroups ? (
-                <Paper
-                    elevation={0}
-                    sx={{
-                        borderRadius: 1,
-                        overflow: 'hidden'
-                    }}
-                >
-                    <AlphabetButtons values={LETTER_VALUES} value={value} onChange={handleValue} />
-                </Paper>
-            ) : localizedGroups.map((group, groupIndex) => (
+            {pickerGroups.map((group, groupIndex) => (
                 <Paper
                     key={group.id}
                     elevation={0}
@@ -117,7 +108,7 @@ const AlphabetPicker: React.FC<AlphabetPickerProps> = ({
                     }}
                 >
                     <AlphabetButtons
-                        values={groupIndex === 0 ? ['#', ...group.values] : group.values}
+                        values={localizedGroups && groupIndex === 0 ? ['#', ...group.values] : group.values}
                         value={value}
                         onChange={handleValue}
                     />
